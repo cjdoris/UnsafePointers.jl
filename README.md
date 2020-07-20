@@ -7,7 +7,7 @@ This package exports one type, `UnsafePtr{T}`, which behaves identically to a re
 ## Install
 
 ```
-pkg> add https://github.com/cjdoris/UnsafePointers.jl
+pkg> add UnsafePointers
 ```
 
 ## Usage
