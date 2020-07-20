@@ -1,6 +1,6 @@
 # UnsafePointers.jl
 
-Convenient pointer accesses.
+Convenient (but unsafe) pointer accesses.
 
 This package exports one type, `UnsafePtr{T}`, which behaves identically to a regular `Ptr{T}` but has some convenient (but unsafe) pointer access semantics.
 
