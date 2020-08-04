@@ -21,10 +21,11 @@ UnsafePtr([T,] r)
 A pointer to the contents of `r` which may be a `Ptr`, `Ref`, or anything with a `pointer` method. `T` specifies the element type.
 
 It has convenient (but unsafe) semantics:
-* `p[]` dereferences the value, and can be assigned to.
-* `p[i]` dereferences the `i`th value, assuming the pointer points to an array.
+* `p[]` dereferences the element, and can be assigned to.
+* `p[i]` dereferences the `i`th element, assuming the pointer points to an array.
 * `p.name` is an `UnsafePtr` to the `name` field of `p[]`.
-* `p+i` is an `UnsafePtr` to the `i`th next value. `(p+i-1)[]` and `p[i]` are equivalent.
+* `p+i` is an `UnsafePtr` to the `i`th next element. `(p+i-1)[]` and `p[i]` are equivalent.
+* `p-q` is the number of elements between `p` and `q`, so that `p === q+(p-q)`.
 * Iteration yields `p[1]`, `p[2]`, ... forever.
 
 The first four operations have these C equivalents: `*p`, `p[i-1]`, `&(p->name)` and `p+i`.
