@@ -8,17 +8,20 @@ module UnsafePointers
     export UnsafePtr
 
     """
-        UnsafePtr([T,] r)
+        UnsafePtr{[T]}(r)
 
-    A pointer to the contents of `r` which may be a `Ptr`, `Ref`, or anything with a `pointer` method. `T` specifies the element type.
+    A pointer to the contents of `r` which may be a `Ptr`, `Ref`, `Array`, `String` or anything with a `pointer` method. `T` specifies the element type.
 
     It has convenient (but unsafe) semantics:
     * `p[]` dereferences the element, and can be assigned to.
     * `p[i]` dereferences the `i`th element, assuming the pointer points to an array.
-    * `p.name` is an `UnsafePtr` to the `name` field of `p[]`.
+    * `p.name` is an `UnsafePtr` to the `name` field of `p[]`. For tuples, `p._n` refers to the `n`th field.
     * `p+i` is an `UnsafePtr` to the `i`th next element. `(p+i-1)[]` and `p[i]` are equivalent.
     * `p-q` is the number of elements between `p` and `q`, so that `p === q+(p-q)`.
     * Iteration yields `p[1]`, `p[2]`, ... forever.
+    * `Array(p, dims...)` is an array view of contiguous data pointed to by `p` (equivalent to `unsafe_wrap(Array, pointer(p), dims)`).
+    * `p[idxs]`/`view(p, idxs)` is an array/view of the `i`th element for each `i ∈ idxs`.
+    * `String(p, [length])` converts `p` to a string (equivalent to `unsafe_string(pointer(p), length)`).
 
     The first four operations have these C equivalents: `*p`, `p[i-1]`, `&(p->name)` and `p+i`.
 
@@ -37,17 +40,18 @@ module UnsafePointers
     Here we access and modify the individual fields of a (mutable) reference to a (immutable) named tuple.
 
     ```julia
-    r = Ref((a=1, b=(c=2, d=3)))
-    @show r[]       # (a = 1, b = (c = 2, d = 3))
+    r = Ref((a=1, b=(2, 3)))
+    @show r[]            # (a = 1, b = (2, 3))
     p = UnsafePtr(r)
     p.a[] = 99
-    p.b.d[] *= 10
-    @show r[]       # (a = 99, b = (c = 2, d = 30))
+    p.b._2[] *= 10
+    @show r[]            # (a = 99, b = (2, 30))
+    @show Array(p.a, 3)  # [99, 2, 30]
     ```
     """
     struct UnsafePtr{T} <: Ref{T}
         ptr :: Ptr{T}
-        UnsafePtr{T}(p::Ptr) where {T} = new{T}(Ptr{T}(p))
+        UnsafePtr{T}(p::Ptr{T}) where {T} = new{T}(p)
     end
 
     function Base.show(io::IO, p::UnsafePtr)
@@ -63,14 +67,17 @@ module UnsafePointers
     (P::Type{<:Ptr})(p::UnsafePtr) = P(pointer(p))
 
     # convert Ptr -> UnsafePtr
-    Base.convert(P::Type{UnsafePtr}, p::Ptr) = UnsafePtr(p)
-    Base.convert(P::Type{UnsafePtr{T}}, p::Ptr) where {T} = UnsafePtr(T, p)
+    Base.convert(::Type{UnsafePtr}, p::Ptr) = UnsafePtr(p)
+    Base.convert(::Type{UnsafePtr{T}}, p::Ptr) where {T} = UnsafePtr{T}(p)
+    Base.convert(::Type{UnsafePtr}, p) = convert(UnsafePtr, convert(Ptr, p))
+    Base.convert(::Type{UnsafePtr{T}}, p) where {T} = convert(UnsafePtr{T}, convert(Ptr{T}, p))
 
     Base.unsafe_convert(P::Type{<:Union{Ptr,UnsafePtr}}, p::UnsafePtr) =
         Base.unsafe_convert(P, pointer(p))
 
-    UnsafePtr(T::Type, p::UnsafePtr) = UnsafePtr{T}(pointer(p))
-    UnsafePtr(T::Type, args...) = UnsafePtr(T, UnsafePtr(args...))
+    UnsafePtr{T}(p::Ptr) where {T} = UnsafePtr{T}(Ptr{T}(p))
+    UnsafePtr{T}(p::UnsafePtr) where {T} = UnsafePtr{T}(pointer(p))
+    UnsafePtr{T}(p) where {T} = UnsafePtr{T}(UnsafePtr(p))
 
     UnsafePtr(p::Ptr{T}) where {T} = UnsafePtr{T}(p)
     UnsafePtr(p::UnsafePtr) = p
@@ -92,20 +99,38 @@ module UnsafePointers
     Base.getindex(p::UnsafePtr, T::Type, i::Integer=1) =
         convert(T, unsafe_load(p, i))
 
+    Base.getindex(p::UnsafePtr, idxs::AbstractArray{<:Integer}) =
+        [getindex(p, i) for i in idxs]
+
+    Base.getindex(p::UnsafePtr, T::Type, idxs::AbstractArray{<:Integer}) =
+        [getindex(p, T, i) for i in idxs]
+
+    Base.getindex(p::UnsafePtr, idxs::AbstractVector{Bool}) =
+        [getindex(p, i) for (i,b) in enumerate(idxs) if b]
+
+    Base.getindex(p::UnsafePtr, T::Type, idxs::AbstractVector{Bool}) =
+        [getindex(p, T, i) for (i,b) in enumerate(idxs) if b]
+
     Base.setindex!(p::UnsafePtr, x, i::Integer=1) =
         unsafe_store!(p, x, i)
 
-    Base.getproperty(p::UnsafePtr{T}, n) where {T} =
-        UnsafePtr(_fieldtype(T, Val(n)), pointer(p) + _fieldoffset(T, Val(n)))
+    _getproperty(p::UnsafePtr{T}, n) where {T} =
+        UnsafePtr{_fieldtype(T, Val(n))}(pointer(p) + _fieldoffset(T, Val(n)))
 
-    Base.setproperty!(p::UnsafePtr, n, x) =
+    Base.getproperty(p::UnsafePtr, n) = _getproperty(p, n)
+    Base.getproperty(p::UnsafePtr, n::Symbol) = _getproperty(p, n)
+    Base.getproperty(p::UnsafePtr, n::Integer) = _getproperty(p, n)
+
+    _setproperty!(p::UnsafePtr, n, x) =
         error("setting properties not supported; maybe you meant `p.$n[] = ...`")
 
-    Base.propertynames(p::UnsafePtr{T}, private=false) where {T} =
-        fieldnames(T)
+    Base.setproperty!(p::UnsafePtr, n, x) = _setproperty!(p, n, x)
+    Base.setproperty!(p::UnsafePtr, n::Symbol, x) = _setproperty!(p, n, x)
+    Base.setproperty!(p::UnsafePtr, n::Integer, x) = _setproperty!(p, n, x)
 
-    Base.iterate(p0::UnsafePtr{T}, p::UnsafePtr{T}=p0) where {T} =
-        p[], p+1
+    Base.propertynames(p::UnsafePtr{T}, private=false) where {T} = fieldnames(T)
+
+    Base.iterate(p0::UnsafePtr{T}, p::UnsafePtr{T}=p0) where {T} = p[], p+1
 
     Base.IteratorSize(::Type{<:UnsafePtr}) = Base.IsInfinite()
 
@@ -124,17 +149,50 @@ module UnsafePointers
     Base.:(==)(p::UnsafePtr, q::Ptr) = pointer(p) == q
     Base.:(==)(p::Ptr, q::UnsafePtr) = p == pointer(q)
 
+    # Array(p, dims...) = unsafe_wrap(Array, pointer(p), dims)
+    (::Type{Array{T,N}})(p::UnsafePtr, dims::Vararg{Integer,N}) where {T,N} = unsafe_wrap(Array, Ptr{T}(pointer(p)), dims)
+    (::Type{Array{T}})(p::UnsafePtr, dims::Vararg{Integer,N}) where {T,N} = Array{T,N}(p, dims...)
+    (::Type{Array{_T,N} where _T})(p::UnsafePtr{T}, dims::Vararg{Integer,N}) where {T,N} = Array{T,N}(p, dims...)
+    Base.Array(p::UnsafePtr{T}, dims::Vararg{Integer,N}) where {T,N} = Array{T,N}(p, dims...)
+    (::Type{A})(p::UnsafePtr, dims::Tuple{Vararg{Integer}}) where {A<:Array} = A(p, dims...)
+
+    # view(p, idxs)
+    Base.view(p::UnsafePtr, i::Integer=1) = Array(p+(i-1))
+    Base.view(p::UnsafePtr, i::AbstractUnitRange{<:Integer}) = Array(p+(first(i)-1), length(i))
+    function Base.view(p::UnsafePtr, i::AbstractVector{<:Integer})
+        if isempty(i)
+            o = 0
+            a = Array(p, 0)
+        else
+            i0, i1 = extrema(i)
+            o = i0 - 1
+            a = Array(p+o, i1-o)
+        end
+        view(a, i.-o)
+    end
+
+    # String(p, [length]) = unsafe_string(pointer(p), length)
+    (::Type{String})(p::UnsafePtr) = unsafe_string(Ptr{UInt8}(pointer(p)))
+    (::Type{String})(p::UnsafePtr, length::Integer) = unsafe_string(Ptr{UInt8}(pointer(p)), length)
+
     @generated function _fieldindex(::Type{T}, ::Val{i}) where {T,i}
         if i isa Integer
-            1 ≤ i ≤ fieldcount(T) || error("invalid field index $i for $T")
+            1 ≤ i ≤ fieldcount(T) || @goto error
             return i
-        elseif i isa Symbol
-            j = findfirst(==(i), fieldnames(T))
-            j isa Integer || error("invalid field name $i for $T")
+        elseif T <: Tuple && i isa Symbol
+            s = string(i)
+            startswith(s, "_") || @goto error
+            j = tryparse(Int, s[2:end])
+            j isa Int || @goto error
+            1 ≤ j ≤ fieldcount(T) || @goto error
             return j
         else
-            error("expected an integer or symbol")
+            j = findfirst(==(i), fieldnames(T))
+            j isa Integer || @goto error
+            return j
         end
+        @label error
+        error("invalid field name $(repr(i)) for $(repr(T))")
     end
 
     @generated _fieldoffset(::Type{T}, ::Val{i}) where {T,i} =
