@@ -114,19 +114,19 @@ module UnsafePointers
     Base.setindex!(p::UnsafePtr, x, i::Integer=1) =
         unsafe_store!(p, x, i)
 
-    _getproperty(p::UnsafePtr{T}, n) where {T} =
-        UnsafePtr{_fieldtype(T, Val(n))}(pointer(p) + _fieldoffset(T, Val(n)))
+    _getproperty(p::UnsafePtr{T}, n::Val) where {T} =
+        UnsafePtr{_fieldtype(T, n)}(pointer(p) + _fieldoffset(T, n))
 
-    Base.getproperty(p::UnsafePtr, n) = _getproperty(p, n)
-    Base.getproperty(p::UnsafePtr, n::Symbol) = _getproperty(p, n)
-    Base.getproperty(p::UnsafePtr, n::Integer) = _getproperty(p, n)
+    Base.getproperty(p::UnsafePtr, n::Val) = _getproperty(p, n)
+    Base.getproperty(p::UnsafePtr, n::Symbol) = _getproperty(p, Val(n))
+    Base.getproperty(p::UnsafePtr, n::Integer) = _getproperty(p, Val(Int(n)))
 
-    _setproperty!(p::UnsafePtr, n, x) =
-        error("setting properties not supported; maybe you meant `p.$n[] = ...`")
+    _setproperty!(p::UnsafePtr, ::Val{name}, x) where {name} =
+        error("setting properties not supported; maybe you meant `p.$name[] = ...`")
 
-    Base.setproperty!(p::UnsafePtr, n, x) = _setproperty!(p, n, x)
-    Base.setproperty!(p::UnsafePtr, n::Symbol, x) = _setproperty!(p, n, x)
-    Base.setproperty!(p::UnsafePtr, n::Integer, x) = _setproperty!(p, n, x)
+    Base.setproperty!(p::UnsafePtr, n::Val, x) = _setproperty!(p, n, x)
+    Base.setproperty!(p::UnsafePtr, n::Symbol, x) = _setproperty!(p, Val(n), x)
+    Base.setproperty!(p::UnsafePtr, n::Integer, x) = _setproperty!(p, Val(Int(n)), x)
 
     Base.propertynames(p::UnsafePtr{T}, private=false) where {T} = fieldnames(T)
 
