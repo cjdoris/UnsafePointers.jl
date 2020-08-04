@@ -13,10 +13,11 @@ module UnsafePointers
     A pointer to the contents of `r` which may be a `Ptr`, `Ref`, or anything with a `pointer` method. `T` specifies the element type.
 
     It has convenient (but unsafe) semantics:
-    * `p[]` dereferences the value, and can be assigned to.
-    * `p[i]` dereferences the `i`th value, assuming the pointer points to an array.
+    * `p[]` dereferences the element, and can be assigned to.
+    * `p[i]` dereferences the `i`th element, assuming the pointer points to an array.
     * `p.name` is an `UnsafePtr` to the `name` field of `p[]`.
-    * `p+i` is an `UnsafePtr` to the `i`th next value. `(p+i-1)[]` and `p[i]` are equivalent.
+    * `p+i` is an `UnsafePtr` to the `i`th next element. `(p+i-1)[]` and `p[i]` are equivalent.
+    * `p-q` is the number of elements between `p` and `q`, so that `p === q+(p-q)`.
     * Iteration yields `p[1]`, `p[2]`, ... forever.
 
     The first four operations have these C equivalents: `*p`, `p[i-1]`, `&(p->name)` and `p+i`.
@@ -94,29 +95,34 @@ module UnsafePointers
     Base.setindex!(p::UnsafePtr, x, i::Integer=1) =
         unsafe_store!(p, x, i)
 
-    Base.getproperty(p::UnsafePtr{T}, n::Symbol) where {T} =
+    Base.getproperty(p::UnsafePtr{T}, n) where {T} =
         UnsafePtr(_fieldtype(T, Val(n)), pointer(p) + _fieldoffset(T, Val(n)))
 
-    Base.setproperty!(p::UnsafePtr, n::Symbol, x) =
+    Base.setproperty!(p::UnsafePtr, n, x) =
         error("setting properties not supported; maybe you meant `p.$n[] = ...`")
 
-    Base.propertynames(p::UnsafePtr{T}) where {T} =
+    Base.propertynames(p::UnsafePtr{T}, private=false) where {T} =
         fieldnames(T)
 
     Base.iterate(p0::UnsafePtr{T}, p::UnsafePtr{T}=p0) where {T} =
         p[], p+1
 
+    Base.IteratorSize(::Type{<:UnsafePtr}) = Base.IsInfinite()
+
     Base.:+(p::UnsafePtr{T}, o::Integer) where {T} = UnsafePtr(pointer(p) + o*sizeof(T))
     Base.:+(o::Integer, p::UnsafePtr{T}) where {T} = UnsafePtr(o*sizeof(T) + pointer(p))
 
     Base.:-(p::UnsafePtr{T}, o::Integer) where {T} = UnsafePtr(pointer(p) - o*sizeof(T))
-    Base.:-(o::Integer, p::UnsafePtr{T}) where {T} = UnsafePtr(o*sizeof(T) - pointer(p))
 
     function Base.:-(p::UnsafePtr{T}, q::UnsafePtr{T}) where {T}
         q, r = fldmod(pointer(p) - pointer(q), sizeof(T))
         r == 0 || error("pointers to T must be a multiple of sizeof(T) apart")
         q
     end
+
+    Base.:(==)(p::UnsafePtr, q::UnsafePtr) = pointer(p) == pointer(q)
+    Base.:(==)(p::UnsafePtr, q::Ptr) = pointer(p) == q
+    Base.:(==)(p::Ptr, q::UnsafePtr) = p == pointer(q)
 
     @generated function _fieldindex(::Type{T}, ::Val{i}) where {T,i}
         if i isa Integer
