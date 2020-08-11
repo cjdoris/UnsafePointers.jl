@@ -7,7 +7,7 @@ Convenient (but unsafe) pointer accesses.
 p->second_field[3] = 9
 
 # In Julia you do this:
-unsafe_store!(unsafe_load(unsafe_load(p)+fieldoffset(eltype(T),2))+3*sizeof(fieldtype(eltype(T),2)), 9)
+unsafe_store!(unsafe_load(unsafe_load(p) + fieldoffset(eltype(p), 2)) + 3*sizeof(fieldtype(eltype(p), 2)), 9)
 
 # Now you can do this:
 UnsafePtr(p).second_field[][4] = 9
