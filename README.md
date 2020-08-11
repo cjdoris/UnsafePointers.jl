@@ -2,6 +2,13 @@
 
 Convenient (but unsafe) pointer accesses.
 
+```julia
+# instead of this
+unsafe_store!(unsafe_load(unsafe_load(p)+fieldoffset(eltype(T),2))+3*sizeof(fieldtype(eltype(T),2)), 9)
+# do this
+UnsafePtr(p)._2[][3] = 9
+```
+
 This package exports one type, `UnsafePtr{T}`, which behaves similarly to a regular `Ptr{T}` but has some convenient (but unsafe) pointer access semantics.
 
 Useful for example for accessing or modifying data exposed by C interfaces through pointers.
