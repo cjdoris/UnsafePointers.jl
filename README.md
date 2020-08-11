@@ -10,7 +10,8 @@ p->second_field[3] = 9
 unsafe_store!(unsafe_load(unsafe_load(p) + fieldoffset(eltype(p), 2)) + 3*sizeof(fieldtype(eltype(p), 2)), 9)
 
 # Now you can do this:
-UnsafePtr(p).second_field[][4] = 9
+q = UnsafePtr(p)
+q.second_field[][4] = 9
 ```
 
 This package exports one type, `UnsafePtr{T}`, which behaves similarly to a regular `Ptr{T}` but has some convenient (but unsafe) pointer access semantics.
