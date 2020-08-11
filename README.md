@@ -3,10 +3,13 @@
 Convenient (but unsafe) pointer accesses.
 
 ```julia
-# instead of this
+# In C you do this:
+p->second_field[2] = 9
+
+# In Julia you do this:
 unsafe_store!(unsafe_load(unsafe_load(p)+fieldoffset(eltype(T),2))+3*sizeof(fieldtype(eltype(T),2)), 9)
 
-# do this
+# Now you can do this:
 UnsafePtr(p).second_field[][3] = 9
 ```
 
