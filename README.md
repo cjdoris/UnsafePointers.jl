@@ -33,9 +33,7 @@ It has convenient (but unsafe) semantics:
 
 The first four operations have these C equivalents: `*p`, `p[i-1]`, `&(p->name)` and `p+i`.
 
-If the result of dereferencing would be a `Ptr`, an `UnsafePtr` is returned instead. Use `p[Ptr, i]` or `unsafe_load(p, i)` to avoid this.
-
-Use `pointer(p)` to retrieve the underlying `Ptr`.
+If the result of dereferencing is pointer-like then an `UnsafePtr` is returned instead (see `doautowrap`). Use `p[!,i]` or `unsafe_load(p,i)` to get the original value.
 
 ## Safety
 

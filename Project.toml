@@ -1,7 +1,7 @@
 name = "UnsafePointers"
 uuid = "e17b2a0c-0bdf-430a-bd0c-3a23cae4ff39"
 authors = ["Christopher Doris <github.com/cjdoris>"]
-version = "0.2.1"
+version = "0.2.2"
 
 [compat]
 julia = "1.0"
