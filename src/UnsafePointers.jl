@@ -88,9 +88,6 @@ Base.unsafe_load(p::UnsafePtr, i::Integer=1) =
 Base.unsafe_store!(p::UnsafePtr, x, i::Integer=1) =
     unsafe_store!(pointer(p), x, i)
 
-Base.getindex(p::UnsafePtr, i::Integer=1) =
-    unsafe_load(p, i)
-
 """
     doautowrap(T)
 
