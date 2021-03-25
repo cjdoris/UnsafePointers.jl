@@ -67,11 +67,13 @@ Base.convert(P::Type{<:Ptr}, p::UnsafePtr) = convert(P, pointer(p))
 # convert Ptr -> UnsafePtr
 Base.convert(::Type{UnsafePtr}, p::Ptr) = UnsafePtr(p)
 Base.convert(::Type{UnsafePtr{T}}, p::Ptr) where {T} = UnsafePtr{T}(p)
+Base.convert(::Type{UnsafePtr}, p::UnsafePtr) = p
+Base.convert(::Type{UnsafePtr{T}}, p::UnsafePtr{T}) where {T} = p
 Base.convert(::Type{UnsafePtr}, p) = convert(UnsafePtr, convert(Ptr, p))
 Base.convert(::Type{UnsafePtr{T}}, p) where {T} = convert(UnsafePtr{T}, convert(Ptr{T}, p))
 
-Base.unsafe_convert(P::Type{<:Union{Ptr,UnsafePtr}}, p::UnsafePtr) =
-    Base.unsafe_convert(P, pointer(p))
+Base.unsafe_convert(::Type{P}, p::UnsafePtr) where {P<:Ptr} = Base.unsafe_convert(P, pointer(p))
+Base.unsafe_convert(::Type{Ptr{T}}, p::UnsafePtr) where {T} = Base.unsafe_convert(Ptr{T}, pointer(p))
 
 UnsafePtr{T}(p::Ptr) where {T} = UnsafePtr{T}(Ptr{T}(p))
 UnsafePtr{T}(p::UnsafePtr) where {T} = UnsafePtr{T}(pointer(p))
