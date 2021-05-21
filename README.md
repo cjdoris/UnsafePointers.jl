@@ -27,10 +27,12 @@ pkg> add UnsafePointers
 ## Usage
 
 ```julia
-UnsafePtr{[T]}(r)
+UnsafePtr{T}(r)
 ```
 
-A pointer to the contents of `r` which may be a `Ptr`, `Ref`, `Array`, `String` or anything with a `pointer` method. `T` specifies the element type.
+A pointer to the contents of `r` which may be a `Ptr`, `Ref`, `Array`, `String` or anything with a `pointer(r)` method.
+
+`T` specifies the element type and is optional.
 
 It has convenient (but unsafe) semantics:
 * `p[]` dereferences the element, and can be assigned to.

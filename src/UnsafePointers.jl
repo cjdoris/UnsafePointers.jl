@@ -8,9 +8,11 @@ module UnsafePointers
 export UnsafePtr
 
 """
-    UnsafePtr{[T]}(r)
+    UnsafePtr{T}(r)
 
-A pointer to the contents of `r` which may be a `Ptr`, `Ref`, `Array`, `String` or anything with a `pointer` method. `T` specifies the element type.
+A pointer to the contents of `r` which may be a `Ptr`, `Ref`, `Array`, `String` or anything with a `pointer(r)` method.
+
+`T` specifies the element type and is optional.
 
 It has convenient (but unsafe) semantics:
 * `p[]` dereferences the element, and can be assigned to.
@@ -79,9 +81,9 @@ UnsafePtr{T}(p::Ptr) where {T} = UnsafePtr{T}(Ptr{T}(p))
 UnsafePtr{T}(p::UnsafePtr) where {T} = UnsafePtr{T}(pointer(p))
 UnsafePtr{T}(p) where {T} = UnsafePtr{T}(UnsafePtr(p))
 
-UnsafePtr(p::Ptr{T}) where {T} = UnsafePtr{T}(p)
 UnsafePtr(p::UnsafePtr) = p
-UnsafePtr(r::Ref) = UnsafePtr(Base.unsafe_convert(Ptr{eltype(r)}, r))
+UnsafePtr(p::Ptr{T}) where {T} = UnsafePtr{T}(p)
+UnsafePtr(r::Ref{T}) where {T} = UnsafePtr(Base.unsafe_convert(Ptr{T}, r))
 UnsafePtr(x) = UnsafePtr(pointer(x))
 
 Base.unsafe_load(p::UnsafePtr, i::Integer=1) =
@@ -109,14 +111,14 @@ Base.getindex(p::UnsafePtr, ::typeof(!), i::Integer=1) =
 Base.getindex(p::UnsafePtr, idxs::AbstractArray{<:Integer}) =
     [getindex(p, i) for i in idxs]
 
-Base.getindex(p::UnsafePtr, R, idxs::AbstractArray{<:Integer}) =
-    [getindex(p, R, i) for i in idxs]
+Base.getindex(p::UnsafePtr, ::typeof(!), idxs::AbstractArray{<:Integer}) =
+    [getindex(p, !, i) for i in idxs]
 
 Base.getindex(p::UnsafePtr, idxs::AbstractVector{Bool}) =
     [getindex(p, i) for (i,b) in enumerate(idxs) if b]
 
-Base.getindex(p::UnsafePtr, R, idxs::AbstractVector{Bool}) =
-    [getindex(p, R, i) for (i,b) in enumerate(idxs) if b]
+Base.getindex(p::UnsafePtr, ::typeof(!), idxs::AbstractVector{Bool}) =
+    [getindex(p, !, i) for (i,b) in enumerate(idxs) if b]
 
 Base.setindex!(p::UnsafePtr{T}, x, i::Integer=1) where {T} =
     unsafe_store!(p, convert(T, x), i)
@@ -131,14 +133,12 @@ Base.getproperty(p::UnsafePtr, n::Val) = _getproperty(p, n)
 Base.getproperty(p::UnsafePtr, n::Symbol) = _getproperty(p, Val(n))
 Base.getproperty(p::UnsafePtr, n::Integer) = _getproperty(p, Val(Int(n)))
 
-_setproperty!(p::UnsafePtr, ::Val{name}, x) where {name} =
+Base.setproperty!(::UnsafePtr, name::Symbol, ::Any) =
     error("setting properties not supported; maybe you meant `p.$name[] = ...`")
+Base.setproperty!(::UnsafePtr, name, ::Any) =
+    error("setting properties not supported; maybe you meant `getproperty(p, $(repr(name)))[] = ...`")
 
-Base.setproperty!(p::UnsafePtr, n::Val, x) = _setproperty!(p, n, x)
-Base.setproperty!(p::UnsafePtr, n::Symbol, x) = _setproperty!(p, Val(n), x)
-Base.setproperty!(p::UnsafePtr, n::Integer, x) = _setproperty!(p, Val(Int(n)), x)
-
-Base.propertynames(p::UnsafePtr{T}, private=false) where {T} = fieldnames(T)
+Base.propertynames(::UnsafePtr{T}, private::Bool=false) where {T} = fieldnames(T)
 
 Base.iterate(p0::UnsafePtr{T}, p::UnsafePtr{T}=p0) where {T} = p[], p+1
 
