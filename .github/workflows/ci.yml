@@ -1,0 +1,50 @@
+name: CI
+on:
+  push:
+    branches:
+      - master
+    tags: ['*']
+  pull_request:
+
+jobs:
+  test:
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
+    permissions:
+      actions: write
+      contents: read
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - 'lts'
+          - '1'
+          - 'nightly'
+        os:
+          - ubuntu-latest
+          - macOS-latest
+          - windows-latest
+        arch:
+          - x64
+          - x86
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install Julia
+      - uses: julia-actions/setup-julia@latest
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
+
+      # Cache everything
+      - uses: julia-actions/cache@v1
+
+      # Run the tests
+      - uses: julia-actions/julia-runtest@latest
+
+      # Upload coverage
+      - uses: codecov/codecov-action@v4
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
