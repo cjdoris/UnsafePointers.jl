@@ -10,8 +10,13 @@ Convenient (but unsafe) pointer accesses.
 # In C you do this:
 p->second_field[3] = 9
 
-# In Julia you do this:
-unsafe_store!(unsafe_load(unsafe_load(p) + fieldoffset(eltype(p), 2)) + 3*sizeof(fieldtype(eltype(p), 2)), 9)
+# In base Julia you do this:
+unsafe_store!(
+    unsafe_load(
+        unsafe_load(p) + fieldoffset(eltype(p), 2)
+    ) + 3 * sizeof(fieldtype(eltype(p), 2)),
+    9
+)
 
 # Now you can do this:
 q = UnsafePtr(p)
