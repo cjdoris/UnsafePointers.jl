@@ -47,6 +47,10 @@ import UnsafePointers: UnsafePtr
         @test p.b[] == (1.5, 42)
         @test p.b._2[] == 42
 
+        second_field = getproperty(p, 2)
+        @test second_field[] == (1.5, 42)
+        @test second_field == p.b
+
         cfield = p.c
         @test cfield[] isa UnsafePtr{Int}
         @test cfield[!] == pointer(ints)
@@ -120,5 +124,56 @@ import UnsafePointers: UnsafePtr
 
         raw = wrapped_ptr[!]
         @test String(UnsafePtr(raw), length(bytes)) == "hello world"
+    end
+
+    @testset "metadata and errors" begin
+        struct MetaFixture
+            a::Int
+            b::Float64
+        end
+
+        fixture = Ref(MetaFixture(1, 2.0))
+        p = UnsafePtr(fixture)
+
+        shown = sprint(show, p)
+        @test occursin("UnsafePtr", shown)
+        @test occursin("@", shown)
+
+        @test propertynames(p) == fieldnames(MetaFixture)
+        @test_throws ErrorException p.c
+        @test_throws ErrorException p.a = 2
+        @test_throws ErrorException getproperty(p, 3)
+
+        other = UnsafePtr{MetaFixture}(p)
+        @test other == p
+        rawptr = Base.unsafe_convert(Ptr{MetaFixture}, fixture)
+        @test other == rawptr
+        @test rawptr == other
+    end
+
+    @testset "boolean indexing" begin
+        refs = [Ref(i) for i in 1:5]
+        ptrs = Ptr{Int}[Base.unsafe_convert(Ptr{Int}, r) for r in refs]
+        parr = UnsafePtr(ptrs)
+        mask = [true, false, true, false, true]
+
+        wrapped = parr[mask]
+        @test all(w isa UnsafePtr{Int} for w in wrapped)
+        @test [w[] for w in wrapped] == [r[] for (r, m) in zip(refs, mask) if m]
+
+        raw = parr[!, mask]
+        @test raw == ptrs[mask]
+    end
+
+    @testset "views and iteration" begin
+        data = collect(41:50)
+        p = UnsafePtr(data)
+
+        empty_view = view(p, Int[])
+        @test size(empty_view) == (0,)
+        @test collect(empty_view) == Int[]
+
+        taken = collect(Base.Iterators.take(p, 4))
+        @test taken == data[1:4]
     end
 end
