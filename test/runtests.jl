@@ -19,6 +19,8 @@ import UnsafePointers: UnsafePtr
         uptr[3] = 42
         @test xs[end] == 42
         @test_throws InexactError uptr[1] = 1.2
+        @test uptr[[1, 3]] == [1, 42]
+        @test uptr[!, [2, 3]] == [2, 42]
     end
 
     @testset "string conversion" begin
@@ -69,6 +71,8 @@ import UnsafePointers: UnsafePtr
         @test q[] == buf[3]
         @test q - p == 2
         @test (p + 5) - q == 3
+        mid = p + 3
+        @test (mid - 2)[] == buf[2]
 
         q[] = 77
         @test buf[3] == 77
@@ -79,6 +83,7 @@ import UnsafePointers: UnsafePtr
         @test auto[] == buf[1]
         @test (auto + 4)[] == buf[5]
         @test (auto + 4) - auto == 4
+        @test (4 + auto)[] == buf[5]
 
         raw = wrapped_ptr[!]
         @test raw == pointer(buf)
@@ -104,9 +109,12 @@ import UnsafePointers: UnsafePtr
         auto = wrapped_ptr[]
         @test Array(auto, length(buf)) == buf
         @test collect(view(auto, 3:6)) == buf[3:6]
+        @test view(auto, 4)[] == buf[4]
 
         raw = wrapped_ptr[!]
         @test Array(UnsafePtr(raw), length(buf)) == buf
+        any_vec = Array{T,1} where T
+        @test any_vec(auto, length(buf)) == buf
     end
 
     @testset "string conversions" begin
@@ -126,6 +134,51 @@ import UnsafePointers: UnsafePtr
         @test String(UnsafePtr(raw), length(bytes)) == "hello world"
     end
 
+    @testset "conversions" begin
+        buf = collect(21:26)
+        p = UnsafePtr(buf)
+        raw = pointer(buf)
+
+        @test convert(Ptr{Int}, p) == raw
+        @test Ptr{Int}(p) == raw
+
+        narrowed = convert(UnsafePtr{Int}, raw)
+        @test pointer(narrowed) == raw
+        @test convert(UnsafePtr, raw) == UnsafePtr(raw)
+        @test convert(UnsafePtr, p) === p
+        @test convert(UnsafePtr{Int}, p) === p
+
+        ref = Ref(Int32(7))
+        typed_from_ref = UnsafePtr{Int32}(ref)
+        @test typed_from_ref[] == 7
+        typed_from_ptr = UnsafePtr{Int}(raw)
+        @test pointer(typed_from_ptr) == raw
+        reinterpreted = UnsafePtr{UInt8}(p)
+        @test pointer(reinterpreted) == pointer(p)
+        @test UnsafePtr(p) === p
+
+        if !isdefined(@__MODULE__, :FakePointer)
+            struct FakePointer
+                ptr::Ptr{Int}
+            end
+        end
+        Base.convert(::Type{Ptr}, fake::FakePointer) = fake.ptr
+        Base.convert(::Type{Ptr{Int}}, fake::FakePointer) = fake.ptr
+        fake = FakePointer(raw)
+        @test convert(UnsafePtr, fake) == UnsafePtr(raw)
+        @test pointer(convert(UnsafePtr{Int}, fake)) == raw
+
+        @test Base.unsafe_convert(Ptr{Int}, p) == raw
+        @test Base.unsafe_convert(Ptr{Int}, narrowed) == raw
+        @test Base.unsafe_convert(Ptr, p) == raw
+
+        holder_ref = Ref(pointer(buf))
+        holder = UnsafePtr(holder_ref)
+        shifted = raw + sizeof(Int)
+        holder[!, 1] = shifted
+        @test holder[!, 1] == shifted
+    end
+
     @testset "metadata and errors" begin
         struct MetaFixture
             a::Int
@@ -143,6 +196,7 @@ import UnsafePointers: UnsafePtr
         @test_throws ErrorException p.c
         @test_throws ErrorException p.a = 2
         @test_throws ErrorException getproperty(p, 3)
+        @test_throws ErrorException setproperty!(p, 1, nothing)
 
         other = UnsafePtr{MetaFixture}(p)
         @test other == p
