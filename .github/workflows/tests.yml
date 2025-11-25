@@ -31,7 +31,7 @@ jobs:
             arch: x86
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       # Install Julia
       - uses: julia-actions/setup-julia@v2
