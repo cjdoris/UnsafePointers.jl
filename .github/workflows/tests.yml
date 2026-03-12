@@ -40,7 +40,7 @@ jobs:
           arch: ${{ matrix.arch }}
 
       # Cache everything
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@v3
 
       # Run the tests
       - uses: julia-actions/julia-runtest@v1
